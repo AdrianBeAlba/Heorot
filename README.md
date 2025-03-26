@@ -1,10 +1,26 @@
-# Heorot
-## **Documentación del Proyecto: Sistema de Gestión de Servidores con Docker, Ansible y Redes**
+# **Documentación del Proyecto: Sistema de Gestión de Servidores con Docker, Ansible y Redes**
 
 ## **1. Introducción**
 Este proyecto proporciona una solución automatizada para la gestión de servidores virtualizados utilizando **Docker**, la configuración de los mismos con **Ansible** y la gestión de redes. Se implementa a través de un **script principal en Bash**, el cual ofrece un **menú interactivo** con diversas opciones para facilitar su administración. Además, permite exportar e importar configuraciones completas en formato ZIP para su reutilización en otros entornos.
 
-## **2. Funcionalidades del Menú Principal**
+## **2. Resumen del Proyecto**
+El sistema proporciona una interfaz en Bash para gestionar servidores en contenedores Docker, configurar servicios con Ansible y administrar redes de forma automatizada. 
+
+**Funcionalidades clave:**
+- **Instalación y configuración automática**: Un setup inicial que instala dependencias y configura el entorno.
+- **Gestor de servidores**: Creación, eliminación, renombrado y reasignación de servidores Docker con `docker-compose`.
+- **Gestor de roles Ansible**: Creación y asignación de roles para configurar servidores automáticamente.
+- **Gestor de redes**: Creación, eliminación y administración de redes Docker.
+- **Exportación e importación de infraestructura**: Guarda y restaura configuraciones completas, incluyendo datos de los contenedores.
+
+**Beneficios:**
+- **Automatización Total**: Facilita la creación, configuración y gestión de servidores sin tareas manuales.
+- **Portabilidad**: Permite exportar e importar infraestructuras rápidamente.
+- **Eficiencia**: La carpeta `temp/` optimiza la gestión de datos temporales.
+- **Modularidad**: Se pueden agregar nuevos servidores, redes y roles sin modificar la estructura base.
+- **Compatibilidad**: Diseñado para funcionar en **Linux y WSL (Debian/Ubuntu)**.
+
+## **3. Funcionalidades del Menú Principal**
 
 ### **0. Setup (Instalación y Configuración Inicial)**
 Esta opción configura el entorno para el correcto funcionamiento del sistema:
@@ -82,7 +98,7 @@ Permite restaurar una infraestructura previamente exportada.
 
 ---
 
-## **3. Estructura de Directorios Final**
+## **4. Estructura de Directorios Final**
 
 ```
 📂 Proyecto/
@@ -116,15 +132,5 @@ Permite restaurar una infraestructura previamente exportada.
 └── docker-compose.yml        # Configuración global
 ```
 
-## **4. Beneficios del Proyecto**
-
-✔️ **Automatización Total**: Facilita la creación, configuración y gestión de servidores sin tareas manuales.
-✔️ **Portabilidad**: Permite exportar e importar infraestructuras rápidamente.
-✔️ **Eficiencia**: La carpeta `temp/` optimiza la gestión de datos temporales.
-✔️ **Modularidad**: Se pueden agregar nuevos servidores, redes y roles sin modificar la estructura base.
-✔️ **Compatibilidad**: Diseñado para funcionar en **Linux y WSL (Debian/Ubuntu)**.
-
----
-
-📌 **Este documento proporciona una guía clara y estructurada del proyecto. ¿Necesitas alguna modificación o agregar algún detalle extra?** 🚀
-
+## **5. Conclusión**
+Este proyecto ofrece una solución integral para la gestión automatizada de servidores con Docker y Ansible. Su modularidad y facilidad de uso lo convierten en una herramienta potente para la administración de infraestructuras virtuales. Gracias a su capacidad de exportación e importación, permite la portabilidad de configuraciones, facilitando la replicación de entornos en diferentes sistemas.
