@@ -32,8 +32,8 @@ echo "Estructura de directorios creada."
 # Crear archivos CSV iniciales si no existen
 touch redes/redes.csv
 
-echo "name" > redes/redes.csv
-echo "default" >> redes/redes.csv
+echo "name,network_ip,subnet_mask" > redes/redes.csv
+echo "default,192.168.99.0,255.255.255.0" >> redes/redes.csv
 
 touch temp/servidores.csv
 echo "name,network" > temp/servidores.csv
@@ -43,8 +43,37 @@ echo "name,path" > roles/roles.csv
 
 echo "Archivos CSV iniciales creados."
 
+# Crear rol de Apache con Ansible Galaxy
+echo "Creando rol de Apache con Ansible Galaxy..."
+ansible-galaxy init roles/apache
+
+# Definir tareas para instalar Apache y configurar un index.html
+echo "---" > roles/apache/tasks/main.yml
+echo "- name: Instalar Apache" >> roles/apache/tasks/main.yml
+echo "  apt:" >> roles/apache/tasks/main.yml
+echo "    name: apache2" >> roles/apache/tasks/main.yml
+echo "    state: present" >> roles/apache/tasks/main.yml
+
+echo "- name: Copiar archivo index.html" >> roles/apache/tasks/main.yml
+echo "  copy:" >> roles/apache/tasks/main.yml
+echo "    src: index.html" >> roles/apache/tasks/main.yml
+echo "    dest: /var/www/html/index.html" >> roles/apache/tasks/main.yml
+echo "    mode: '0644'" >> roles/apache/tasks/main.yml
+
+echo "- name: Reiniciar Apache" >> roles/apache/tasks/main.yml
+echo "  service:" >> roles/apache/tasks/main.yml
+echo "    name: apache2" >> roles/apache/tasks/main.yml
+echo "    state: restarted" >> roles/apache/tasks/main.yml
+
+# Crear archivo index.html
+echo "Bienvenido a Heorot!" > roles/apache/files/index.html
+
+echo "Rol de Apache creado y configurado."
+
+echo "apache,roles/apache" >> roles/roles.csv
+
 # Instalar dependencias necesarias
 echo "Instalando dependencias..."
-sudo apt update && sudo apt install -y docker.io docker-compose ansible zip unzip
+sudo apt update && sudo apt install -y docker.io docker-compose ansible zip unzip ssh
 
 echo "Setup inicial completado con éxito."

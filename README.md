@@ -22,14 +22,14 @@ El sistema proporciona una interfaz en Bash para gestionar servidores en contene
 
 ## **3. Funcionalidades del Menú Principal**
 
-### **0. Setup (Instalación y Configuración Inicial)**
-Esta opción configura el entorno para el correcto funcionamiento del sistema:
-- Instala dependencias necesarias (**Docker, Docker Compose, Ansible, Python, SSH, Sudo**).
-- Crea la estructura de carpetas y archivos iniciales.
-- Genera una red predeterminada llamada `default`.
-- Crea roles básicos de Ansible (`apache`, `dhcp`, `openldap`).
-- Inicializa los CSV que almacenan la información de servidores, redes y roles.
-
+### 0. Setup (Instalación y configuración inicial)
+- Crea la estructura de carpetas necesarias: `compose`, `roles`, `redes`, `temp`, `imports`, `scripts`.
+- Genera los archivos CSV base (`redes.csv`, `servidores.csv`, `roles.csv`).
+- Crea la red **default** (192.168.99.0/24).
+- **Instala dependencias**: `docker.io`, `docker-compose`, `ansible`, `zip`, `unzip`, `ssh`.
+- **Genera un rol de Apache en Ansible** utilizando `ansible-galaxy init`.
+- Define las tareas necesarias en `tasks/main.yml` para instalar y configurar Apache.
+- Crea un archivo `index.html` con el mensaje **"Bienvenido a Heorot!"** en la carpeta `files` del rol Apache.
 ---
 
 ### **1. Gestionar Servidores**
