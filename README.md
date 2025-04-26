@@ -137,7 +137,7 @@ Este proyecto ofrece una solución integral para la gestión automatizada de ser
 
 # Tambien ver
 
-1. 📂 [Estructura del Proyecto](docs/01_estructura_proyecto.md)
-2. 🎯 [Filosofía y Objetivos](docs/02_idea_fundamental.md)
-3. 🛠️ [Casos de Uso](docs/03_casos_uso.md)
-4. 🧩 [Dependencias y Requisitos](docs/04_dependencias.md)
+1. 📂 [Estructura del Proyecto](Docs/01_estructura_proyecto.md)
+2. 🎯 [Filosofía y Objetivos](Docs/02_idea_fundamental.md)
+3. 🛠️ [Casos de Uso](Docs/03_casos_uso.md)
+4. 🧩 [Dependencias y Requisitos](Docs/04_dependencias.md)
