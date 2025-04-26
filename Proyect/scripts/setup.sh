@@ -3,8 +3,8 @@
 ##############################################
 # Heorot - Setup Inicial
 # ----------------------------------------------
-# Autor: [Tu Nombre]
-# Fecha: [Fecha Actual]
+# Autor: Adrian Bejarano Albarracín
+# Fecha: 27/03/2025
 # Descripción: Este script configura el entorno inicial para
 #              el correcto funcionamiento de Heorot. Crea la 
 #              estructura de directorios y archivos necesarios,
@@ -15,7 +15,6 @@
 directorios=(
     "compose"  # Almacena los docker-compose generados
     "roles"    # Contiene los roles de Ansible
-    "redes"    # CSV con las redes creadas
     "temp"     # Archivos temporales de ejecución
     "imports"  # Para exportaciones e importaciones de estructuras
     "scripts"  # Almacena los scripts del sistema
@@ -30,16 +29,15 @@ done
 echo "Estructura de directorios creada."
 
 # Crear archivos CSV iniciales si no existen
-touch redes/redes.csv
-
-echo "name,network_ip,subnet_mask" > redes/redes.csv
-echo "default,192.168.99.0,255.255.255.0" >> redes/redes.csv
+touch temp/redes.csv
+echo "name,network_ip,subnet_mask" > temp/redes.csv
+echo "default,192.168.99.0,255.255.255.0" >> temp/redes.csv
 
 touch temp/servidores.csv
 echo "name,network" > temp/servidores.csv
 
-touch roles/roles.csv
-echo "name,path" > roles/roles.csv
+touch temp/roles.csv
+echo "name,path" > temp/roles.csv
 
 echo "Archivos CSV iniciales creados."
 
@@ -70,7 +68,7 @@ echo "Bienvenido a Heorot!" > roles/apache/files/index.html
 
 echo "Rol de Apache creado y configurado."
 
-echo "apache,roles/apache" >> roles/roles.csv
+echo "apache,roles/apache" >> temp/roles.csv
 
 # Instalar dependencias necesarias
 echo "Instalando dependencias..."

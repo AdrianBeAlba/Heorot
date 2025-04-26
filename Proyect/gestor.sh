@@ -11,16 +11,19 @@
 
 # Función para gestionar servidores
 gestionar_servicios() {
+    clear
     bash scripts/servidores.sh
 }
 
 # Función para gestionar roles
 gestionar_roles() {
+    clear
     bash scripts/roles.sh
 }
 
 # Función para gestionar redes
 gestionar_redes() {
+    clear
     bash scripts/redes.sh
 }
 
