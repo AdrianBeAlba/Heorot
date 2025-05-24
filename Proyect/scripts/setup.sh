@@ -24,20 +24,20 @@ directorios=(
 echo "Creando estructura de directorios..."
 for dir in "${directorios[@]}"; do
     mkdir -p "$dir"
+    echo "Creado $dir"
 done
 
 echo "Estructura de directorios creada."
 
 # Crear archivos CSV iniciales si no existen
 touch temp/redes.csv
-echo "name,network_ip,subnet_mask" > temp/redes.csv
-echo "default,192.168.99.0,255.255.255.0" >> temp/redes.csv
+echo "default,192.168.99.0,255.255.255.0" > temp/redes.csv
+
+docker network create default
 
 touch temp/servidores.csv
-echo "name,network" > temp/servidores.csv
 
 touch temp/roles.csv
-echo "name,path" > temp/roles.csv
 
 echo "Archivos CSV iniciales creados."
 
@@ -70,8 +70,10 @@ echo "Rol de Apache creado y configurado."
 
 echo "apache,roles/apache" >> temp/roles.csv
 
+echo "Rol apache configurado"
+
 # Instalar dependencias necesarias
 echo "Instalando dependencias..."
-sudo apt update && sudo apt install -y docker.io docker-compose ansible zip unzip ssh
+sudo apt update && sudo apt install -y docker.io docker-compose ansible zip unzip ssh util-linux bsdmainutils
 
 echo "Setup inicial completado con éxito."

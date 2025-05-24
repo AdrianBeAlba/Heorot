@@ -44,7 +44,6 @@ setup_inicial() {
 
 # Bucle principal del menú
 while true; do
-    clear
     echo "============================="
     echo "  HEOROT  "
     echo "============================="
@@ -54,7 +53,7 @@ while true; do
     echo "3. Gestionar redes"
     echo "4. Exportar estructura actual"
     echo "5. Importar estructura desde ZIP"
-    echo "6. Salir"
+    echo "9. Salir"
     echo "============================="
     read -p "Seleccione una opción: " opcion
 
@@ -65,7 +64,7 @@ while true; do
         3) gestionar_redes ;;
         4) exportar_estructura ;;
         5) importar_estructura ;;
-        6) echo "Saliendo..."; exit 0 ;;
+        9) echo "Saliendo..."; exit 0 ;;
         *) echo "Opción no válida. Intente nuevamente."; sleep 2 ;;
     esac
 

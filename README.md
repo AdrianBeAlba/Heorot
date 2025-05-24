@@ -26,7 +26,7 @@ El sistema proporciona una interfaz en Bash para gestionar servidores en contene
 - Crea la estructura de carpetas necesarias: `compose`, `roles`, `redes`, `temp`, `imports`, `scripts`.
 - Genera los archivos CSV base (`redes.csv`, `servidores.csv`, `roles.csv`).
 - Crea la red **default** (192.168.99.0/24).
-- **Instala dependencias**: `docker.io`, `docker-compose`, `ansible`, `zip`, `unzip`, `ssh`.
+- **Instala dependencias**: `docker.io`, `docker-compose`, `ansible`, `zip`, `unzip`, `ssh`, `util-linux` y `bsdmainutils`.
 - **Genera un rol de Apache en Ansible** utilizando `ansible-galaxy init`.
 - Define las tareas necesarias en `tasks/main.yml` para instalar y configurar Apache.
 - Crea un archivo `index.html` con el mensaje **"Bienvenido a Heorot!"** en la carpeta `files` del rol Apache.
