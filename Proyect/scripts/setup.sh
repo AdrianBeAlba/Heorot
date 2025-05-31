@@ -18,6 +18,7 @@ directorios=(
     "temp"     # Archivos temporales de ejecución
     "imports"  # Para exportaciones e importaciones de estructuras
     "scripts"  # Almacena los scripts del sistema
+    # "volumes"  # Almacena volumenes de docker
 )
 
 # Crear las carpetas si no existen
@@ -30,10 +31,15 @@ done
 echo "Estructura de directorios creada."
 
 # Crear archivos CSV iniciales si no existen
-touch temp/redes.csv
-echo "default,192.168.99.0,255.255.255.0" > temp/redes.csv
+echo "Creando archivo redes.csv..."
+mkdir -p temp
+echo "heorot_default,192.168.99.0,255.255.255.0" > temp/redes.csv
 
-docker network create default
+echo "Creando red Docker 'heorot_default'..."
+docker network create \
+  --driver=bridge \
+  --subnet=192.168.99.0/24 \
+  heorot_default || echo "La red 'heorot_default' ya existe."
 
 touch temp/servidores.csv
 

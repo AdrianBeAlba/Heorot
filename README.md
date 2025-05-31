@@ -38,11 +38,10 @@ Permite gestionar los servidores Docker de la infraestructura.
 **Submenú:**
 - **Listar servidores**: Muestra los servidores creados.
 - **Crear servidor**: Solicita nombre y red, generando su `docker-compose.yml`.
-- **Renombrar servidor**: Permite modificar el nombre de un servidor.
-- **Cambiar red del servidor**: Reasigna el servidor a una red diferente.
 - **Eliminar servidor**: Borra su contenedor y archivo de configuración.
+- **Activar/Desactivar servidor**: Activa o desactiva el contenedor de docker.
 
-Los servidores se almacenan en `compose/` y se registran en `compose/servidores.csv`.
+Los servidores se almacenan en `compose/` y se registran en `temp/servidores.csv`.
 
 ---
 
@@ -55,7 +54,7 @@ Permite gestionar los roles de Ansible y asignarlos a servidores.
 - **Asignar rol**: Aplica un rol a un servidor usando `ansible-playbook`.
 - **Eliminar rol**: Borra la carpeta del rol y lo elimina del CSV.
 
-Los roles se almacenan en `roles/` y se registran en `roles/roles.csv`.
+Los roles se almacenan en `roles/` y se registran en `temp/roles.csv`.
 
 ---
 
@@ -68,7 +67,7 @@ Permite gestionar las redes Docker usadas por los servidores.
 - **Renombrar red**: Modifica el nombre de una red.
 - **Eliminar red**: Borra una red seleccionada.
 
-Las redes se almacenan en `redes/` y se registran en `redes/redes.csv`.
+Las redes se almacenan en `redes/` y se registran en `temp/redes.csv`.
 
 ---
 

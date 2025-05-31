@@ -14,6 +14,16 @@ SERVIDORES_CSV="temp/servidores.csv"
 COMPOSE_DIR="compose"
 REDES_CSV="temp/redes.csv"
 
+function mascara_a_cidr() {
+    IFS=. read -r i1 i2 i3 i4 <<< "$1"
+    bin=$(printf '%08d%08d%08d%08d\n' \
+        "$(bc <<< "obase=2;$i1")" \
+        "$(bc <<< "obase=2;$i2")" \
+        "$(bc <<< "obase=2;$i3")" \
+        "$(bc <<< "obase=2;$i4")")
+    echo "$bin" | grep -o "1" | wc -l
+}
+
 function listar_servidores() {
     echo "Listado de servidores:"
     echo "Nombre           Red              Estado"
@@ -23,20 +33,31 @@ function listar_servidores() {
 
 function crear_servidor() {
     read -p "Nombre del servidor: " nombre
-    read -p "Red (dejar vacío para usar 'default'): " red
-
-    if [[ -z "$red" ]]; then
-        red="default"
-    fi
+    read -p "Red (dejar vacío para usar 'heorot_default'): " red
+    [[ -z "$red" ]] && red="heorot_default"
 
     if ! grep -q "^$red," "$REDES_CSV"; then
         echo "Error: La red especificada no existe."
         return 1
     fi
 
+    direccion=$(grep "^$red," "$REDES_CSV" | cut -d',' -f2)
+    mascara=$(grep "^$red," "$REDES_CSV" | cut -d',' -f3)
+    cidr=$(mascara_a_cidr "$mascara")
+    subnet="$direccion/$cidr"
+
+    # Crear red de Docker si no existe
+    if ! docker network ls --format '{{.Name}}' | grep -qw "$red"; then
+        docker network create \
+            --subnet="$subnet" \
+            --driver=bridge \
+            "$red"
+        echo "Red $red creada con subred $subnet."
+    fi
+
     mkdir -p "$COMPOSE_DIR/$nombre"
     cat > "$COMPOSE_DIR/$nombre/docker-compose.yml" <<EOL
-version: '3'
+version: '3.9'
 services:
   $nombre:
     image: debian:latest
@@ -55,36 +76,37 @@ EOL
     echo "Servidor $nombre creado y activado."
 }
 
-function modificar_servidor() {
-    listar_servidores
-    read -p "Nombre del servidor a modificar: " nombre
+# Deprecated
+# function modificar_servidor() {
+#     listar_servidores
+#     read -p "Nombre del servidor a modificar: " nombre
 
-    if ! grep -q "^$nombre," "$SERVIDORES_CSV"; then
-        echo "Error: El servidor no existe."
-        return 1
-    fi
+#     if ! grep -q "^$nombre," "$SERVIDORES_CSV"; then
+#         echo "Error: El servidor no existe."
+#         return 1
+#     fi
 
-    read -p "Nuevo nombre (dejar vacío para mantener actual): " nuevo_nombre
-    read -p "Nueva red (dejar vacío para mantener actual): " nueva_red
+#     read -p "Nuevo nombre (dejar vacío para mantener actual): " nuevo_nombre
+#     read -p "Nueva red (dejar vacío para mantener actual): " nueva_red
 
-    nuevo_nombre="${nuevo_nombre:-$nombre}"
-    vieja_red=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f2)
-    nueva_red="${nueva_red:-$vieja_red}"
+#     nuevo_nombre="${nuevo_nombre:-$nombre}"
+#     vieja_red=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f2)
+#     nueva_red="${nueva_red:-$vieja_red}"
 
-    if ! grep -q "^$nueva_red," "$REDES_CSV"; then
-        echo "Error: La red especificada no existe."
-        return 1
-    fi
+#     if ! grep -q "^$nueva_red," "$REDES_CSV"; then
+#         echo "Error: La red especificada no existe."
+#         return 1
+#     fi
 
-    estado_actual=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f3)
-    sed -i "s/^$nombre,.*/$nuevo_nombre,$nueva_red,$estado_actual/" "$SERVIDORES_CSV"
+#     estado_actual=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f3)
+#     sed -i "s/^$nombre,.*/$nuevo_nombre,$nueva_red,$estado_actual/" "$SERVIDORES_CSV"
 
-    mv "$COMPOSE_DIR/$nombre" "$COMPOSE_DIR/$nuevo_nombre"
-    sed -i "s/container_name: $nombre/container_name: $nuevo_nombre/" "$COMPOSE_DIR/$nuevo_nombre/docker-compose.yml"
-    sed -i "s/$nombre:/$nuevo_nombre:/" "$COMPOSE_DIR/$nuevo_nombre/docker-compose.yml"
+#     mv "$COMPOSE_DIR/$nombre" "$COMPOSE_DIR/$nuevo_nombre"
+#     sed -i "s/container_name: $nombre/container_name: $nuevo_nombre/" "$COMPOSE_DIR/$nuevo_nombre/docker-compose.yml"
+#     sed -i "s/$nombre:/$nuevo_nombre:/" "$COMPOSE_DIR/$nuevo_nombre/docker-compose.yml"
 
-    echo "Servidor modificado correctamente."
-}
+#     echo "Servidor modificado correctamente."
+# }
 
 function eliminar_servidor() {
     listar_servidores
@@ -120,7 +142,8 @@ function toggle_estado_servidor() {
         nuevo_estado="activo"
     fi
 
-    sed -i "s/^$nombre,[^,]*,[^,]*/$nombre,$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f2),$nuevo_estado/" "$SERVIDORES_CSV"
+    red_asociada=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d',' -f2)
+    sed -i "s/^$nombre,[^,]*,[^,]*/$nombre,$red_asociada,$nuevo_estado/" "$SERVIDORES_CSV"
     echo "Estado del servidor $nombre cambiado a $nuevo_estado."
 }
 
@@ -130,18 +153,16 @@ function menu_servidores() {
         echo "==== Gestión de Servidores ===="
         echo "1. Listar servidores"
         echo "2. Crear servidor"
-        echo "3. Modificar servidor"
-        echo "4. Eliminar servidor"
-        echo "5. Activar/Desactivar servidor"
+        echo "3. Eliminar servidor"
+        echo "4. Activar/Desactivar servidor"
         echo "9. Volver al menú principal"
         read -p "Seleccione una opción: " opcion
 
         case "$opcion" in
             1) listar_servidores ;;
             2) crear_servidor ;;
-            3) modificar_servidor ;;
-            4) eliminar_servidor ;;
-            5) toggle_estado_servidor ;;
+            3) eliminar_servidor ;;
+            4) toggle_estado_servidor ;;
             9) break ;;
             *) echo "Opción no válida" ;;
         esac
