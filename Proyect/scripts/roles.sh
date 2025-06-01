@@ -7,24 +7,25 @@ SERVIDORES_CSV="temp/servidores.csv"
 source scripts/utils.sh
 source scripts/servidores.sh
 
-function listar_roles() {
+listar_roles() {
     echo "=== Roles Disponibles ==="
-    if [[ ! -d "$ROLES_DIR" || -z $(ls -A "$ROLES_DIR") ]]; then
-        echo "No hay roles creados."
+    
+    if [[ ! -f "$ROLES_CSV" || ! -s "$ROLES_CSV" ]]; then
+        echo "No hay roles registrados."
         return
     fi
 
-    for rol in "$ROLES_DIR"/*; do
-        [ -d "$rol" ] && echo "- $(basename "$rol")"
+    cut -d',' -f1 "$ROLES_CSV" | while read -r rol; do
+        [[ -n "$rol" ]] && echo "- $rol"
     done
 }
 
-function crear_rol() {
+crear_rol() {
     read -p "Nombre del rol: " nombre
     crear_rolPorNombre $nombre
 }
 
-function asignar_rol() {
+asignar_rol() {
     listar_roles
     read -p "Nombre del rol a asignar: " rol
 
@@ -129,20 +130,21 @@ EOF
 
 
 
-function eliminar_rol() {
+eliminar_rol() {
+    listar_roles
     read -p "Nombre del rol a eliminar: " rol
 
-    if [[ ! -d "$ROLES_DIR/$rol" ]]; then
+    if [[ -z $(cat $ROLES_CSV | grep $rol) ]]; then
         echo "El rol '$rol' no existe."
         return
     fi
 
     rm -rf "$ROLES_DIR/$rol"
-    grep -v "^$rol," "$ROLES_CSV" > "$ROLES_CSV.tmp" && mv "$ROLES_CSV.tmp" "$ROLES_CSV"
+    sed -i "/^$rol/d" "$ROLES_CSV"
     echo "Rol '$rol' eliminado y registros actualizados."
 }
 
-function menu_roles() {
+menu_roles() {
     while true; do
         echo "==== Gestión de Roles ===="
         echo "1. Listar roles"
@@ -162,5 +164,6 @@ function menu_roles() {
         esac
     done
 }
-
-menu_roles
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    menu_roles
+fi

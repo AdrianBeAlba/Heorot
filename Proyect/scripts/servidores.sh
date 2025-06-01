@@ -129,7 +129,7 @@ EOL
 #     echo "Servidor modificado correctamente."
 # }
 
-function eliminar_servidor() {
+eliminar_servidor() {
     listar_servidores
     read -p "Nombre del servidor a eliminar: " nombre
 
@@ -150,7 +150,7 @@ function eliminar_servidor() {
     echo "Servidor $nombre eliminado correctamente."
 }
 
-function toggle_estado_servidor() {
+toggle_estado_servidor() {
     listar_servidores
     read -p "Nombre del servidor a activar/desactivar: " nombre
 
@@ -160,11 +160,13 @@ function toggle_estado_servidor() {
     fi
 
     estado_actual=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f3)
+    compose_file="$COMPOSE_DIR/$nombre/docker-compose.yml"
+
     if [[ "$estado_actual" == "activo" ]]; then
-        docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" down
+        docker compose -f "$compose_file" pause
         nuevo_estado="inactivo"
     else
-        docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d
+        docker compose -f "$compose_file" unpause || docker compose -f "$compose_file" up -d
         nuevo_estado="activo"
     fi
 
@@ -173,7 +175,7 @@ function toggle_estado_servidor() {
     echo "Estado del servidor $nombre cambiado a $nuevo_estado."
 }
 
-function menu_servidores() {
+menu_servidores() {
     while true; do
         echo ""
         echo "==== Gestión de Servidores ===="
