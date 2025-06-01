@@ -18,8 +18,9 @@ directorios=(
     "temp"     # Archivos temporales de ejecución
     "imports"  # Para exportaciones e importaciones de estructuras
     "scripts"  # Almacena los scripts del sistema
-    # "volumes"  # Almacena volumenes de docker
 )
+
+source scripts/utils.sh
 
 # Crear las carpetas si no existen
 echo "Creando estructura de directorios..."
@@ -49,8 +50,7 @@ echo "Archivos CSV iniciales creados."
 
 # Crear rol de Apache con Ansible Galaxy
 echo "Creando rol de Apache con Ansible Galaxy..."
-ansible-galaxy init roles/apache
-
+crear_rolPorNombre apache
 # Definir tareas para instalar Apache y configurar un index.html
 echo "---" > roles/apache/tasks/main.yml
 echo "- name: Instalar Apache" >> roles/apache/tasks/main.yml
@@ -71,12 +71,18 @@ echo "    state: restarted" >> roles/apache/tasks/main.yml
 
 # Crear archivo index.html
 echo "Bienvenido a Heorot!" > roles/apache/files/index.html
+cat roles/apache/files/index.html
+
+cat > roles/apache/meta/volumes.yml <<EOF
+---
+volumes:
+  - container_path: /var/www/html
+    host_path: var/www/html
+  - container_path: /etc/apache2
+    host_path: etc/apache2
+EOF
 
 echo "Rol de Apache creado y configurado."
-
-echo "apache,roles/apache" >> temp/roles.csv
-
-echo "Rol apache configurado"
 
 # Instalar dependencias necesarias
 echo "Instalando dependencias..."

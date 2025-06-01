@@ -31,7 +31,7 @@ function listar_servidores() {
     awk -F',' '{ printf "%-17s %-17s %-10s\n", $1, $2, $3 }' "$SERVIDORES_CSV"
 }
 
-function crear_servidor() {
+crear_servidor() {
     read -p "Nombre del servidor: " nombre
     read -p "Red (dejar vacío para usar 'heorot_default'): " red
     [[ -z "$red" ]] && red="heorot_default"
@@ -55,7 +55,11 @@ function crear_servidor() {
         echo "Red $red creada con subred $subnet."
     fi
 
+    # Crear estructura para el contenedor
     mkdir -p "$COMPOSE_DIR/$nombre"
+    # Crear carpeta de volúmenes
+    mkdir -p "$COMPOSE_DIR/$nombre/volumes/"
+
     cat > "$COMPOSE_DIR/$nombre/docker-compose.yml" <<EOL
 version: '3.9'
 services:
@@ -66,15 +70,32 @@ services:
       - $red
     tty: true
     stdin_open: true
+    ports:
+      - "22"
+    command: >
+      bash -c "apt update &&
+               apt install -y python3 openssh-server sudo &&
+               useradd -m ansible -s /bin/bash &&
+               echo 'ansible:ansible' | chpasswd &&
+               echo 'ansible ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers &&
+               mkdir -p /var/run/sshd &&
+               /usr/sbin/sshd -D"
+
 networks:
   $red:
     external: true
 EOL
 
     echo "$nombre,$red,activo" >> "$SERVIDORES_CSV"
-    docker-compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d
+
+    docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d
+
+    ansible_disponible $nombre
+    copiar_clave_ssh $nombre
     echo "Servidor $nombre creado y activado."
 }
+
+
 
 # Deprecated
 # function modificar_servidor() {
@@ -117,7 +138,12 @@ function eliminar_servidor() {
         return 1
     fi
 
-    docker-compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" down
+    docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" down
+
+    # Eliminar contenedores/volúmenes huérfanos en Docker (solo si es seguro)
+    echo "Eliminando volúmenes de Docker no usados..."
+    docker volume prune -f > /dev/null
+
     sed -i "/^$nombre,/d" "$SERVIDORES_CSV"
     rm -rf "$COMPOSE_DIR/$nombre"
 
@@ -135,10 +161,10 @@ function toggle_estado_servidor() {
 
     estado_actual=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f3)
     if [[ "$estado_actual" == "activo" ]]; then
-        docker-compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" down
+        docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" down
         nuevo_estado="inactivo"
     else
-        docker-compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d
+        docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d
         nuevo_estado="activo"
     fi
 
@@ -169,4 +195,6 @@ function menu_servidores() {
     done
 }
 
-menu_servidores
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    menu_servidores
+fi
