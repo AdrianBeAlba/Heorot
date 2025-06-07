@@ -10,6 +10,17 @@ NC='\033[0m' # Sin color
 
 CSV="temp/servidores.csv"
 INVENTARIO="temp/inventario.ini"
+COMPOSE_DIR=compose
+# === Funciones de redes ===
+mascara_a_cidr() {
+    IFS=. read -r i1 i2 i3 i4 <<< "$1"
+    bin=$(printf '%08d%08d%08d%08d\n' \
+        "$(bc <<< "obase=2;$i1")" \
+        "$(bc <<< "obase=2;$i2")" \
+        "$(bc <<< "obase=2;$i3")" \
+        "$(bc <<< "obase=2;$i4")")
+    echo "$bin" | grep -o "1" | wc -l
+}
 
 # === Funciones de inventario ansible ===
 generar_inventario() {
@@ -93,7 +104,7 @@ EOF
 }
 
 
-COMPOSE_DIR=compose
+
 mapear_puerto_personalizado() {
     local servidor="$1"
     local compose_file="$COMPOSE_DIR/$servidor/docker-compose.yml"
@@ -121,6 +132,7 @@ mapear_puerto_personalizado() {
     echo "✅ Puerto mapeado correctamente."
 }
 
+# === Funciones de contenedores ===
 ansible_disponible(){
     local nombre=$1
     # Esperar hasta que el usuario 'ansible' exista dentro del contenedor

@@ -9,20 +9,14 @@
 ##############################################
 
 source scripts/utils.sh
+source scripts/redes.sh
+
 
 SERVIDORES_CSV="temp/servidores.csv"
 COMPOSE_DIR="compose"
 REDES_CSV="temp/redes.csv"
 
-function mascara_a_cidr() {
-    IFS=. read -r i1 i2 i3 i4 <<< "$1"
-    bin=$(printf '%08d%08d%08d%08d\n' \
-        "$(bc <<< "obase=2;$i1")" \
-        "$(bc <<< "obase=2;$i2")" \
-        "$(bc <<< "obase=2;$i3")" \
-        "$(bc <<< "obase=2;$i4")")
-    echo "$bin" | grep -o "1" | wc -l
-}
+
 
 function listar_servidores() {
     echo "Listado de servidores:"
@@ -33,26 +27,13 @@ function listar_servidores() {
 
 crear_servidor() {
     read -p "Nombre del servidor: " nombre
+    listar_redes
     read -p "Red (dejar vacío para usar 'heorot_default'): " red
     [[ -z "$red" ]] && red="heorot_default"
 
     if ! grep -q "^$red," "$REDES_CSV"; then
         echo "Error: La red especificada no existe."
         return 1
-    fi
-
-    direccion=$(grep "^$red," "$REDES_CSV" | cut -d',' -f2)
-    mascara=$(grep "^$red," "$REDES_CSV" | cut -d',' -f3)
-    cidr=$(mascara_a_cidr "$mascara")
-    subnet="$direccion/$cidr"
-
-    # Crear red de Docker si no existe
-    if ! docker network ls --format '{{.Name}}' | grep -qw "$red"; then
-        docker network create \
-            --subnet="$subnet" \
-            --driver=bridge \
-            "$red"
-        echo "Red $red creada con subred $subnet."
     fi
 
     # Crear estructura para el contenedor

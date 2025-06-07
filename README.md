@@ -64,7 +64,6 @@ Permite gestionar las redes Docker usadas por los servidores.
 **Submenú:**
 - **Listar redes**: Muestra las redes existentes.
 - **Crear red**: Solicita un nombre y la crea con `docker network create`.
-- **Renombrar red**: Modifica el nombre de una red.
 - **Eliminar red**: Borra una red seleccionada.
 
 Las redes se almacenan en `redes/` y se registran en `temp/redes.csv`.
