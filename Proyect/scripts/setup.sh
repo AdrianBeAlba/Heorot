@@ -16,8 +16,9 @@ directorios=(
     "compose"  # Almacena los docker-compose generados
     "roles"    # Contiene los roles de Ansible
     "temp"     # Archivos temporales de ejecución
-    "imports"  # Para exportaciones e importaciones de estructuras
+    "imports"  # Para importaciones de estructuras
     "scripts"  # Almacena los scripts del sistema
+    "exports"  # Almacena exportaciones
 )
 
 source scripts/utils.sh
@@ -86,6 +87,31 @@ echo "Rol de Apache creado y configurado."
 
 # Instalar dependencias necesarias
 echo "Instalando dependencias..."
-sudo apt update && sudo apt install -y docker.io docker-compose ansible zip unzip ssh util-linux bsdmainutils
+
+# Quitar versiones previas de Docker (si las hay)
+# sudo apt remove -y docker docker.io docker-doc docker-compose || true
+
+# Añadir repositorio oficial de Docker
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+
+# Instalar Docker 27.5.1 + plugins necesarios
+sudo apt install -y \
+  docker-ce=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
+  docker-ce-cli=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-compose-plugin
+
+# Instalar dependencias adicionales
+sudo apt install -y criu ansible ssh util-linux bsdmainutils
 
 echo "Setup inicial completado con éxito."

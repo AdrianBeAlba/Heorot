@@ -1,7 +1,7 @@
 # **Documentación del Proyecto: Sistema de Gestión de Servidores con Docker, Ansible y Redes (Heorot)**
 
 ## **1. Introducción**
-Este proyecto proporciona una solución automatizada para la gestión de servidores virtualizados utilizando **Docker**, la configuración de los mismos con **Ansible** y la gestión de redes. Se implementa a través de un **script principal en Bash**, el cual ofrece un **menú interactivo** con diversas opciones para facilitar su administración. Además, permite exportar e importar configuraciones completas en formato ZIP para su reutilización en otros entornos.
+Este proyecto proporciona una solución automatizada para la gestión de servidores virtualizados utilizando **Docker**, la configuración de los mismos con **Ansible** y la gestión de redes. Se implementa a través de un **script principal en Bash**, el cual ofrece un **menú interactivo** con diversas opciones para facilitar su administración. Además, permite exportar e importar configuraciones completas en formato TAR para su reutilización en otros entornos.
 
 ## **2. Resumen del Proyecto**
 El sistema proporciona una interfaz en Bash para gestionar servidores en contenedores Docker, configurar servicios con Ansible y administrar redes de forma automatizada. 
@@ -26,7 +26,7 @@ El sistema proporciona una interfaz en Bash para gestionar servidores en contene
 - Crea la estructura de carpetas necesarias: `compose`, `roles`, `redes`, `temp`, `imports`, `scripts`.
 - Genera los archivos CSV base (`redes.csv`, `servidores.csv`, `roles.csv`).
 - Crea la red **default** (192.168.99.0/24).
-- **Instala dependencias**: `docker.io`, `docker-compose`, `ansible`, `zip`, `unzip`, `ssh`, `util-linux` y `bsdmainutils`.
+- **Instala dependencias**: `docker.io`, `docker-compose`, `ansible`, `ssh`, `util-linux` y `bsdmainutils`.
 - **Genera un rol de Apache en Ansible** utilizando `ansible-galaxy init`.
 - Define las tareas necesarias en `tasks/main.yml` para instalar y configurar Apache.
 - Crea un archivo `index.html` con el mensaje **"Bienvenido a Heorot!"** en la carpeta `files` del rol Apache.
@@ -71,28 +71,29 @@ Las redes se almacenan en `redes/` y se registran en `temp/redes.csv`.
 ---
 
 ### **4. Exportar Estructura Actual**
-Guarda una copia de la infraestructura en un archivo ZIP dentro de `imports/`.
+Guarda una copia de la infraestructura en un archivo TAR dentro de `exports/`.
 
 **Incluye:**
 - Configuración de servidores (`compose/`).
+- Contenido de los volumenes (`compose/<servidor>/volumes`).
 - Configuración de roles (`roles/`).
-- Configuración de redes (`redes/`).
+- Configuración de redes (`temp/redes.csv`).
 - Archivos temporales en `temp/`.
 - Opcionalmente, los datos de los servidores (`docker export`).
 
-El usuario elige el nombre del archivo ZIP antes de exportarlo.
+El usuario elige el nombre del archivo TAR antes de exportarlo.
 
 ---
 
-### **5. Importar Estructura desde ZIP**
+### **5. Importar Estructura desde TAR**
 Permite restaurar una infraestructura previamente exportada.
 
 **Flujo:**
-1. Muestra un listado de archivos ZIP disponibles en `imports/`.
+1. Muestra un listado de archivos TAR disponibles en `imports/`.
 2. Pregunta si se desea guardar la configuración actual antes de importar.
 3. Borra la infraestructura actual.
-4. Descomprime el ZIP seleccionado e implementa su contenido.
-5. Si el ZIP contiene datos de servidores, los restaura con `docker import`.
+4. Descomprime el TAR seleccionado e implementa su contenido.
+5. Si el TAR contiene datos de servidores, los restaura con `docker import`.
 
 ---
 
@@ -102,21 +103,18 @@ Permite restaurar una infraestructura previamente exportada.
 📂 Proyecto/
 │
 ├── 📂 compose/              # Configuraciones de servidores Docker
-│   ├── servidores.csv       # Listado de servidores
+│   ├── server
+│   │   ├docker-compose.yml
+│   │   ├volumes/
 │
-├── 📂 imports/              # Backups exportados
-│   ├── infraestructura_backup_1.zip
+├── 📂 exports/              # Backups exportados
+│   ├── infraestructura_backup_2.tar.gz
+│
+├── 📂 imports/              # Backups para importar
+│   ├── infraestructura_backup_1.tar.gz
 │
 ├── 📂 roles/                # Roles de Ansible
-│   ├── roles.csv            # Listado de roles disponibles
 │
-├── 📂 redes/                # Redes Docker
-│   ├── redes.csv            # Listado de redes creadas
-│
-├── 📂 temp/                 # Archivos temporales generados durante la ejecución
-│   ├── temp_servidores.csv
-│   ├── temp_redes.csv
-│   ├── temp_roles.csv
 │
 ├── 📂 scripts/              # Scripts principales
 │   ├── setup.sh             # Instalación y configuración inicial
@@ -126,12 +124,47 @@ Permite restaurar una infraestructura previamente exportada.
 │   ├── export.sh            # Exportación de infraestructura
 │   ├── import.sh            # Importación de infraestructura
 │
+├── 📂 temp/                 # Archivos temporales generados durante la ejecución
+│   ├── temp_servidores.csv
+│   ├── temp_redes.csv
+│   ├── temp_roles.csv
+│   ├── inventario.ini        # Inventario de ansible, generado de manera dinamica
+|
 ├── gestor.sh                # Script central del proyecto
-└── docker-compose.yml        # Configuración global
 ```
 
 ## **5. Conclusión**
 Este proyecto ofrece una solución integral para la gestión automatizada de servidores con Docker y Ansible. Su modularidad y facilidad de uso lo convierten en una herramienta potente para la administración de infraestructuras virtuales. Gracias a su capacidad de exportación e importación, permite la portabilidad de configuraciones, facilitando la replicación de entornos en diferentes sistemas.
+
+## ⚠️ Advertencia: Problemas con WSL2 y bind volumes
+
+Si ejecutas este proyecto en **WSL2** (por ejemplo, usando Docker Desktop en Windows), es posible que experimentes problemas al trabajar con volúmenes bind (`type: bind`). En particular:
+
+### Problemas comunes:
+- ❌ **No se eliminan correctamente las carpetas** que estaban montadas como volúmenes después de hacer `docker compose down`.
+- ❌ `rm -rf` sobre carpetas en `compose/` puede fallar silenciosamente o dejar residuos inaccesibles.
+- ❌ `setup` o recreación del servidor puede fallar por rutas que "parecen existir" pero están bloqueadas.
+- 🔄 A veces es necesario reiniciar **WSL** o incluso **Docker Desktop** para poder continuar.
+
+### Causa:
+Esto ocurre por cómo WSL2 gestiona el sistema de archivos. Docker Desktop en Windows ejecuta los contenedores dentro de una máquina virtual, y las carpetas bind montadas desde el entorno WSL pueden quedar bloqueadas por el sistema debido a **sincronización diferida, cachés o locking de bajo nivel**.
+
+### Soluciones recomendadas:
+- ✅ Ejecuta el proyecto en un entorno **Ubuntu real** (ya sea instalado directamente o en una VM con soporte Docker).
+- ✅ Si necesitas seguir usando WSL2:
+  - El propio proyecto hace uso de `docker compose down && docker system prune -f` cuando se elimina un servidor.
+  - Si eso falla, ejecuta:
+
+    ```bash
+    wsl --shutdown
+    ```
+
+    Y luego reinicia WSL y docker desktop antes de volver a intentar crear un servidor o la carpeta compose.
+  - En el peor de los casos, tembien se recomienda reiniciar tu maquina en caso de que la solución anterior no solucione el problema.
+---
+
+> 💡 *Para evitar estos problemas completamente, se recomienda usar este proyecto desde un sistema Linux nativo.*
+
 
 # Tambien ver
 

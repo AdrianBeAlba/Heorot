@@ -1,11 +1,9 @@
 #!/bin/bash
-
-REDES_DIR="redes"
 CSV_REDES="temp/redes.csv"
 
 source scripts/utils.sh
 
-mkdir -p "$REDES_DIR"
+
 mkdir -p "$(dirname "$CSV_REDES")"
 
 listar_redes() {
@@ -37,7 +35,6 @@ crear_red() {
         "$nombre"
 
     if [[ $? -eq 0 ]]; then
-        mkdir -p "$REDES_DIR/$nombre"
         echo "$nombre,$direccion,$mascara" >> "$CSV_REDES"
         echo "✅ Red '$nombre' creada correctamente con subred $subnet."
     else
@@ -57,7 +54,6 @@ eliminar_red() {
     docker network rm "$nombre"
     if [[ $? -eq 0 ]]; then
         sed -i "/^$nombre,/d" "$CSV_REDES"
-        rm -rf "$REDES_DIR/$nombre"
         echo "✅ Red '$nombre' eliminada correctamente."
     else
         echo "❌ No se pudo eliminar la red (quizá esté en uso)."

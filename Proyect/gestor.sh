@@ -52,7 +52,7 @@ while true; do
     echo "2. Gestionar roles"
     echo "3. Gestionar redes"
     echo "4. Exportar estructura actual"
-    echo "5. Importar estructura desde ZIP"
+    echo "5. Importar estructura"
     echo "9. Salir"
     echo "============================="
     read -p "Seleccione una opción: " opcion

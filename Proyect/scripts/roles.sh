@@ -108,7 +108,7 @@ asignar_rol() {
     # Reiniciar contenedor para aplicar volúmenes
     reiniciar_contenedor "$servidor"
     # Regenerar inventario
-    generar_inventario "$servidor" > "$INVENTARIO"
+    generar_inventario
 
     # Playbook temporal
     playbook_temp="roles/apply_${rol}_to_${servidor}.yml"
@@ -127,8 +127,6 @@ EOF
 
     echo "Rol '$rol' asignado a '$servidor'."
 }
-
-
 
 eliminar_rol() {
     listar_roles
