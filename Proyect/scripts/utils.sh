@@ -133,6 +133,45 @@ mapear_puerto_personalizado() {
 }
 
 # === Funciones de contenedores ===
+capturar_estado_contenedor() {
+    local servidor="$1"
+    local compose_file="compose/$servidor/docker-compose.yml"
+    ansible_disponible $servidor
+    
+    # Obtener el nombre del servicio desde el compose (asumimos el primero definido)
+    local servicio=$(awk '/services:/ {getline; print $1}' "$compose_file" | tr -d ':')
+
+    if [[ -z "$servicio" ]]; then
+        echo "❌ No se pudo detectar el nombre del servicio en $compose_file"
+        return 1
+    fi
+    
+    # Obtener el container ID
+    local container_id
+    container_id=$(docker compose -f "$compose_file" ps -q "$servicio")
+
+    if [[ -z "$container_id" ]]; then
+        echo "❌ No se encontró contenedor en ejecución para el servicio '$servicio'."
+        return 1
+    fi
+
+    local imagen="${servicio}:latest"
+
+    # Si la imagen existe, borrarla antes
+    if docker image inspect "$imagen" &>/dev/null; then
+        echo "🧹 Eliminando imagen previa '$imagen'..."
+        docker image rm -f "$imagen"
+    fi
+
+    echo "📦 Creando nueva imagen '$imagen' desde el contenedor '$container_id'..."
+    docker commit "$container_id" "$imagen"
+
+    # Reemplazar la imagen en el docker-compose.yml
+    sed -i "s|^\([[:space:]]*image:\).*|\1 $imagen|" "$compose_file"
+    echo "✅ Imagen '$imagen' aplicada al compose."
+}
+
+
 ansible_disponible(){
     local nombre=$1
     # Esperar hasta que el usuario 'ansible' exista dentro del contenedor
@@ -164,6 +203,7 @@ copiar_clave_ssh() {
 
     # Crear carpeta .ssh si no existe
     docker exec "$nombre" mkdir -p /home/ansible/.ssh
+    docker exec "$nombre" touch /home/ansible/.ssh/authorized_keys
 
     # Copiar clave pública como authorized_keys
     docker cp ~/.ssh/id_rsa.pub "$nombre":/home/ansible/.ssh/authorized_keys

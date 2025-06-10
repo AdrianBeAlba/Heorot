@@ -19,6 +19,19 @@ REDES_CSV="temp/redes.csv"
 
 
 function listar_servidores() {
+    tmp_csv=$(mktemp)
+
+    while IFS=',' read -r nombre red estado; do
+        if docker ps --format '{{.Names}}' | grep -q "^${nombre}$"; then
+            nuevo_estado="activo"
+        else
+            nuevo_estado="inactivo"
+        fi
+        echo "$nombre,$red,$nuevo_estado" >> "$tmp_csv"
+    done < "$SERVIDORES_CSV"
+
+    mv "$tmp_csv" "$SERVIDORES_CSV"
+
     echo "Listado de servidores:"
     echo "Nombre           Red              Estado"
     echo "-------------------------------------------"
@@ -38,8 +51,6 @@ crear_servidor() {
 
     # Crear estructura para el contenedor
     mkdir -p "$COMPOSE_DIR/$nombre"
-    # Crear carpeta de volúmenes
-    mkdir -p "$COMPOSE_DIR/$nombre/volumes/"
 
     cat > "$COMPOSE_DIR/$nombre/docker-compose.yml" <<EOL
 version: '3.9'
@@ -76,40 +87,6 @@ EOL
     echo "Servidor $nombre creado y activado."
 }
 
-
-
-# Deprecated
-# function modificar_servidor() {
-#     listar_servidores
-#     read -p "Nombre del servidor a modificar: " nombre
-
-#     if ! grep -q "^$nombre," "$SERVIDORES_CSV"; then
-#         echo "Error: El servidor no existe."
-#         return 1
-#     fi
-
-#     read -p "Nuevo nombre (dejar vacío para mantener actual): " nuevo_nombre
-#     read -p "Nueva red (dejar vacío para mantener actual): " nueva_red
-
-#     nuevo_nombre="${nuevo_nombre:-$nombre}"
-#     vieja_red=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f2)
-#     nueva_red="${nueva_red:-$vieja_red}"
-
-#     if ! grep -q "^$nueva_red," "$REDES_CSV"; then
-#         echo "Error: La red especificada no existe."
-#         return 1
-#     fi
-
-#     estado_actual=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f3)
-#     sed -i "s/^$nombre,.*/$nuevo_nombre,$nueva_red,$estado_actual/" "$SERVIDORES_CSV"
-
-#     mv "$COMPOSE_DIR/$nombre" "$COMPOSE_DIR/$nuevo_nombre"
-#     sed -i "s/container_name: $nombre/container_name: $nuevo_nombre/" "$COMPOSE_DIR/$nuevo_nombre/docker-compose.yml"
-#     sed -i "s/$nombre:/$nuevo_nombre:/" "$COMPOSE_DIR/$nuevo_nombre/docker-compose.yml"
-
-#     echo "Servidor modificado correctamente."
-# }
-
 eliminar_servidor() {
     listar_servidores
     read -p "Nombre del servidor a eliminar: " nombre
@@ -141,20 +118,29 @@ toggle_estado_servidor() {
     fi
 
     estado_actual=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f3)
-    compose_file="$COMPOSE_DIR/$nombre/docker-compose.yml"
 
-    if [[ "$estado_actual" == "activo" ]]; then
-        docker compose -f "$compose_file" pause
-        nuevo_estado="inactivo"
+    if docker ps -a --format '{{.Names}}' | grep -q "^${nombre}$"; then
+        if [[ "$estado_actual" == "activo" ]]; then
+            docker pause "$nombre"
+            nuevo_estado="inactivo"
+        else
+            if docker inspect -f '{{.State.Paused}}' "$nombre" 2>/dev/null | grep -q true; then
+                docker unpause "$nombre"
+            else
+                docker start "$nombre"
+            fi
+            nuevo_estado="activo"
+        fi
+
+        red_asociada=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d',' -f2)
+        sed -i "s/^$nombre,[^,]*,[^,]*/$nombre,$red_asociada,$nuevo_estado/" "$SERVIDORES_CSV"
+        echo "Estado del servidor $nombre cambiado a $nuevo_estado."
     else
-        docker compose -f "$compose_file" unpause || docker compose -f "$compose_file" up -d
-        nuevo_estado="activo"
+        echo "Error: No existe un contenedor con el nombre '$nombre'."
+        return 1
     fi
-
-    red_asociada=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d',' -f2)
-    sed -i "s/^$nombre,[^,]*,[^,]*/$nombre,$red_asociada,$nuevo_estado/" "$SERVIDORES_CSV"
-    echo "Estado del servidor $nombre cambiado a $nuevo_estado."
 }
+
 
 menu_servidores() {
     while true; do
