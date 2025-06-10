@@ -168,6 +168,9 @@ capturar_estado_contenedor() {
 
     # Reemplazar la imagen en el docker-compose.yml
     sed -i "s|^\([[:space:]]*image:\).*|\1 $imagen|" "$compose_file"
+
+    # Eliminar la línea 'command:' y sus continuaciones (bash -c "...")
+    sed -i '/^[[:space:]]*command: >/,+1d' "$compose_file"
     echo "✅ Imagen '$imagen' aplicada al compose."
 }
 
@@ -217,10 +220,43 @@ copiar_clave_ssh() {
 }
 
 reiniciar_contenedor(){
-    local servidor="$1"
-    local compose_file="$COMPOSE_DIR/$servidor/docker-compose.yml"
+    servidor="$1"
+    compose_file="$COMPOSE_DIR/$servidor/docker-compose.yml"
     echo "🔄 Reiniciando contenedor..."
     docker compose -f "$compose_file" down
     docker compose -f "$compose_file" up -d
     echo "Contenedor reiniciado."
 }
+
+configurar_servidor() {
+    nombre="$1"
+
+    # Esperar que el contenedor esté en estado running
+    timeout=60
+    elapsed=0
+    interval=2
+
+    echo "Esperando a que el contenedor '$nombre' esté en estado 'running'..."
+
+    while ! docker ps --format '{{.Names}}' | grep -qw "^${nombre}$"; do
+        sleep $interval
+        elapsed=$((elapsed + interval))
+        if [ "$elapsed" -ge "$timeout" ]; then
+            echo "Timeout: El contenedor '$nombre' no está en ejecución tras $timeout segundos."
+            return 1
+        fi
+    done
+
+    # Ejecutar configuración dentro del contenedor
+    docker exec "$nombre" bash -c "\
+        apt update && \
+        apt install -y python3 openssh-server sudo && \
+        id -u ansible &>/dev/null || useradd -m ansible -s /bin/bash && \
+        echo 'ansible:ansible' | chpasswd && \
+        echo 'ansible ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+        systemctl enable ssh && \
+        systemctl start ssh"
+
+    echo "Configuración inicial aplicada en el servidor $nombre."
+}
+

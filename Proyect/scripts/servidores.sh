@@ -21,14 +21,29 @@ REDES_CSV="temp/redes.csv"
 function listar_servidores() {
     tmp_csv=$(mktemp)
 
-    while IFS=',' read -r nombre red estado; do
-        if docker ps --format '{{.Names}}' | grep -q "^${nombre}$"; then
-            nuevo_estado="activo"
-        else
-            nuevo_estado="inactivo"
-        fi
-        echo "$nombre,$red,$nuevo_estado" >> "$tmp_csv"
-    done < "$SERVIDORES_CSV"
+while IFS=',' read -r nombre red estado; do
+    # Saltar encabezados o líneas vacías
+    [[ "$nombre" == "nombre" || -z "$nombre" ]] && continue
+
+    if docker inspect "$nombre" &>/dev/null; then
+        estado_actual=$(docker inspect -f '{{.State.Status}}' "$nombre")
+        case "$estado_actual" in
+            running)
+                nuevo_estado="activo"
+                ;;
+            exited|created|paused|dead)
+                nuevo_estado="inactivo"
+                ;;
+            *)
+                nuevo_estado="desconocido"
+                ;;
+        esac
+    else
+        nuevo_estado="inactivo"
+    fi
+
+    echo "$nombre,$red,$nuevo_estado" >> "$tmp_csv"
+done < "$SERVIDORES_CSV"
 
     mv "$tmp_csv" "$SERVIDORES_CSV"
 
@@ -53,25 +68,20 @@ crear_servidor() {
     mkdir -p "$COMPOSE_DIR/$nombre"
 
     cat > "$COMPOSE_DIR/$nombre/docker-compose.yml" <<EOL
-version: '3.9'
 services:
   $nombre:
-    image: debian:latest
+    image: antmelekhin/docker-systemd:debian-12
     container_name: $nombre
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
     networks:
       - $red
+    restart: always
     tty: true
     stdin_open: true
     ports:
       - "22"
-    command: >
-      bash -c "apt update &&
-               apt install -y python3 openssh-server sudo &&
-               useradd -m ansible -s /bin/bash &&
-               echo 'ansible:ansible' | chpasswd &&
-               echo 'ansible ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers &&
-               mkdir -p /var/run/sshd &&
-               /usr/sbin/sshd -D"
 
 networks:
   $red:
@@ -81,11 +91,12 @@ EOL
     echo "$nombre,$red,activo" >> "$SERVIDORES_CSV"
 
     docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d
-
+    configurar_servidor $nombre
     ansible_disponible $nombre
     copiar_clave_ssh $nombre
     echo "Servidor $nombre creado y activado."
 }
+
 
 eliminar_servidor() {
     listar_servidores
@@ -124,11 +135,7 @@ toggle_estado_servidor() {
             docker pause "$nombre"
             nuevo_estado="inactivo"
         else
-            if docker inspect -f '{{.State.Paused}}' "$nombre" 2>/dev/null | grep -q true; then
-                docker unpause "$nombre"
-            else
-                docker start "$nombre"
-            fi
+            docker unpause "$nombre"
             nuevo_estado="activo"
         fi
 

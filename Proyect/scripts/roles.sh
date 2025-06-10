@@ -124,7 +124,8 @@ EOF
     copiar_clave_ssh "$servidor"
     ansible-playbook -i "$INVENTARIO" "$playbook_temp"
     rm -f $playbook_temp
-
+    capturar_estado_contenedor "$servidor"
+    reiniciar_contenedor "$servidor"
     echo "Rol '$rol' asignado a '$servidor'."
 }
 

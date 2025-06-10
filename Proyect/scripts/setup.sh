@@ -23,6 +23,35 @@ directorios=(
 
 source scripts/utils.sh
 
+# Instalar dependencias necesarias
+echo "Instalando dependencias..."
+
+# Quitar versiones previas de Docker (si las hay)
+# sudo apt remove -y docker docker.io docker-doc docker-compose || true
+
+# Añadir repositorio oficial de Docker
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+
+# Instalar Docker 27.5.1 + plugins necesarios
+sudo apt install -y \
+  docker-ce=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
+  docker-ce-cli=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-compose-plugin
+
+# Instalar dependencias adicionales
+sudo apt install -y ansible ssh util-linux bsdmainutils
+
 # Crear las carpetas si no existen
 echo "Creando estructura de directorios..."
 for dir in "${directorios[@]}"; do
@@ -83,35 +112,14 @@ volumes:
     host_path: etc/apache2
 EOF
 
+cat > roles/apache/meta/tasks.txt <<EOF
+# tasks.yml
+# Este archivo contiene comandos de Bash para ser inyectados en el command del docker-compose.
+# Cada línea debe terminar con ' &&' excepto la última.
+
 echo "Rol de Apache creado y configurado."
 
-# Instalar dependencias necesarias
-echo "Instalando dependencias..."
+echo "Trayendo imagen base para los contenedores."
 
-# Quitar versiones previas de Docker (si las hay)
-# sudo apt remove -y docker docker.io docker-doc docker-compose || true
-
-# Añadir repositorio oficial de Docker
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-sudo apt update
-
-# Instalar Docker 27.5.1 + plugins necesarios
-sudo apt install -y \
-  docker-ce=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
-  docker-ce-cli=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
-  containerd.io \
-  docker-buildx-plugin \
-  docker-compose-plugin
-
-# Instalar dependencias adicionales
-sudo apt install -y criu ansible ssh util-linux bsdmainutils
 
 echo "Setup inicial completado con éxito."
