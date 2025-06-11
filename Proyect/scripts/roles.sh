@@ -181,7 +181,7 @@ EOF
     rm -f $playbook_temp
 
     # Aplicar permanencia
-    server_dockerfile="compose/$servidor/dockerfile"
+    server_dockerfile="compose/$servidor/Dockerfile"
     capturar_estado_contenedor "$servidor" "$server_dockerfile"
     reiniciar_contenedor "$servidor"
 

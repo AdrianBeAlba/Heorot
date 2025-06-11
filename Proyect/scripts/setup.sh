@@ -27,7 +27,7 @@ source scripts/utils.sh
 echo "Instalando dependencias..."
 
 # Quitar versiones previas de Docker (si las hay)
-# sudo apt remove -y docker docker.io docker-doc docker-compose || true
+sudo apt remove -y docker docker.io docker-doc docker-compose || true
 
 # Añadir repositorio oficial de Docker
 sudo install -m 0755 -d /etc/apt/keyrings
