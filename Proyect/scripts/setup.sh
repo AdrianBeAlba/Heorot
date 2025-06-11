@@ -41,16 +41,18 @@ echo \
 
 sudo apt update
 
-# Instalar Docker 27.5.1 + plugins necesarios
 sudo apt install -y \
-  docker-ce=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
-  docker-ce-cli=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
+  docker-ce=5:27.5.1-1~ubuntu.22.04~jammy \
+  docker-ce-cli=5:27.5.1-1~ubuntu.22.04~jammy \
   containerd.io \
   docker-buildx-plugin \
   docker-compose-plugin
 
 # Instalar dependencias adicionales
 sudo apt install -y  ansible ssh util-linux bsdmainutils
+
+#Generar clave ssh
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
 
 # Crear las carpetas si no existen
 echo "Creando estructura de directorios..."
