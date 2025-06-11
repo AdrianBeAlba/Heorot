@@ -172,3 +172,4 @@ Esto ocurre por cómo WSL2 gestiona el sistema de archivos. Docker Desktop en Wi
 2. 🎯 [Filosofía y Objetivos](Docs/02_idea_fundamental.md)
 3. 🛠️ [Casos de Uso](Docs/03_casos_uso.md)
 4. 🧩 [Dependencias y Requisitos](Docs/04_dependencias.md)
+5. 📦 [Documentacion avanzada](https://deepwiki.com/AdrianBeAlba/Heorot)
