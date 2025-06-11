@@ -19,19 +19,7 @@ REDES_CSV="temp/redes.csv"
 
 
 function listar_servidores() {
-    tmp_csv=$(mktemp)
-
-    while IFS=',' read -r nombre red estado; do
-        if docker ps --format '{{.Names}}' | grep -q "^${nombre}$"; then
-            nuevo_estado="activo"
-        else
-            nuevo_estado="inactivo"
-        fi
-        echo "$nombre,$red,$nuevo_estado" >> "$tmp_csv"
-    done < "$SERVIDORES_CSV"
-
-    mv "$tmp_csv" "$SERVIDORES_CSV"
-
+    actualizar_lista
     echo "Listado de servidores:"
     echo "Nombre           Red              Estado"
     echo "-------------------------------------------"
@@ -56,31 +44,63 @@ crear_servidor() {
 version: '3.9'
 services:
   $nombre:
-    image: debian:latest
     container_name: $nombre
+    build:
+        context: .
+        dockerfile: Dockerfile
     networks:
       - $red
     tty: true
     stdin_open: true
     ports:
       - "22"
-    command: >
-      bash -c "apt update &&
-               apt install -y python3 openssh-server sudo &&
-               useradd -m ansible -s /bin/bash &&
-               echo 'ansible:ansible' | chpasswd &&
-               echo 'ansible ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers &&
-               mkdir -p /var/run/sshd &&
-               /usr/sbin/sshd -D"
 
 networks:
   $red:
     external: true
 EOL
+    cat > "$COMPOSE_DIR/$nombre/Dockerfile" <<'EOL'
+FROM debian:latest
 
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    if ! dpkg -s supervisor python3 openssh-server sudo > /dev/null 2>&1; then \
+        apt-get install -y supervisor python3 openssh-server sudo; \
+    else \
+        echo "Packages already installed, skipping install"; \
+    fi
+
+RUN if ! id -u ansible > /dev/null 2>&1; then \
+        useradd -m ansible -s /bin/bash; \
+    else \
+        echo "User ansible already exists, skipping useradd"; \
+    fi && \
+    echo 'ansible:ansible' | chpasswd && \
+    grep -q '^ansible ALL=' /etc/sudoers || echo 'ansible ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+    mkdir -p /var/run/sshd
+
+# Add supervisord config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Start supervisord
+CMD ["/usr/bin/supervisord", "-n"]
+EOL
+
+    cat > "$COMPOSE_DIR/$nombre/supervisord.conf" <<EOL
+[supervisord]
+nodaemon=true
+
+[program:sshd]
+command=/usr/sbin/sshd -D -o MaxStartups=50:30:200
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/sshd.err.log
+stdout_logfile=/var/log/sshd.out.log
+EOL
     echo "$nombre,$red,activo" >> "$SERVIDORES_CSV"
 
-    docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d
+    docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up --build -d
 
     ansible_disponible $nombre
     copiar_clave_ssh $nombre
@@ -108,7 +128,7 @@ eliminar_servidor() {
     echo "Servidor $nombre eliminado correctamente."
 }
 
-toggle_estado_servidor() {
+toggle_estado_servidor() {    
     listar_servidores
     read -p "Nombre del servidor a activar/desactivar: " nombre
 
@@ -119,28 +139,40 @@ toggle_estado_servidor() {
 
     estado_actual=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d, -f3)
 
-    if docker ps -a --format '{{.Names}}' | grep -q "^${nombre}$"; then
-        if [[ "$estado_actual" == "activo" ]]; then
-            docker pause "$nombre"
-            nuevo_estado="inactivo"
-        else
-            if docker inspect -f '{{.State.Paused}}' "$nombre" 2>/dev/null | grep -q true; then
-                docker unpause "$nombre"
-            else
-                docker start "$nombre"
-            fi
-            nuevo_estado="activo"
-        fi
-
-        red_asociada=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d',' -f2)
-        sed -i "s/^$nombre,[^,]*,[^,]*/$nombre,$red_asociada,$nuevo_estado/" "$SERVIDORES_CSV"
-        echo "Estado del servidor $nombre cambiado a $nuevo_estado."
-    else
-        echo "Error: No existe un contenedor con el nombre '$nombre'."
+    # Check if docker compose project (folder) exists
+    if [[ ! -d "$COMPOSE_DIR/$nombre" ]]; then
+        echo "Error: No existe un directorio para el servidor '$nombre'."
         return 1
     fi
+
+    # Use docker compose commands inside the server directory
+    if [[ "$estado_actual" == "activo" ]]; then
+        # Server is active, so bring it down (stop & remove containers)
+        docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" down || {
+            echo "Error: Falló docker compose down para $nombre"
+            return 1
+        }
+        nuevo_estado="inactivo"
+    else
+        # Server is inactive, bring it up detached with build
+        docker compose -f "$COMPOSE_DIR/$nombre/docker-compose.yml" up -d --build || {
+            echo "Error: Falló docker compose up para $nombre"
+            return 1
+        }
+        nuevo_estado="activo"
+    fi
+
+    red_asociada=$(grep "^$nombre," "$SERVIDORES_CSV" | cut -d',' -f2)
+    sed -i "s/^$nombre,[^,]*,[^,]*/$nombre,$red_asociada,$nuevo_estado/" "$SERVIDORES_CSV"
+    echo "Estado del servidor $nombre cambiado a $nuevo_estado."
 }
 
+
+reiniciar_servicio(){
+    listar_servidores
+    read -p "Nombre del servidor a reiniciar: " nombre
+    reiniciar_contenedor $nombre
+}
 
 menu_servidores() {
     while true; do
@@ -150,6 +182,8 @@ menu_servidores() {
         echo "2. Crear servidor"
         echo "3. Eliminar servidor"
         echo "4. Activar/Desactivar servidor"
+        echo "5. Reiniciar contenedor"
+        echo "6. Iniciar contenedores inactivos"
         echo "9. Volver al menú principal"
         read -p "Seleccione una opción: " opcion
 
@@ -158,6 +192,8 @@ menu_servidores() {
             2) crear_servidor ;;
             3) eliminar_servidor ;;
             4) toggle_estado_servidor ;;
+            5) reiniciar_servicio ;;
+            6) correr_servidores_inactivos ;;
             9) break ;;
             *) echo "Opción no válida" ;;
         esac

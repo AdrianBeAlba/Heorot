@@ -23,6 +23,35 @@ directorios=(
 
 source scripts/utils.sh
 
+# Instalar dependencias necesarias
+echo "Instalando dependencias..."
+
+# Quitar versiones previas de Docker (si las hay)
+# sudo apt remove -y docker docker.io docker-doc docker-compose || true
+
+# Añadir repositorio oficial de Docker
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+
+# Instalar Docker 27.5.1 + plugins necesarios
+sudo apt install -y \
+  docker-ce=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
+  docker-ce-cli=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-compose-plugin
+
+# Instalar dependencias adicionales
+sudo apt install -y criu ansible ssh util-linux bsdmainutils
+
 # Crear las carpetas si no existen
 echo "Creando estructura de directorios..."
 for dir in "${directorios[@]}"; do
@@ -83,35 +112,16 @@ volumes:
     host_path: etc/apache2
 EOF
 
+cat > roles/apache/meta/services.conf <<EOF
+# Supervisord config for apache2
+[program:apache2]
+command=/usr/sbin/apachectl -D FOREGROUND
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/apache2.err.log
+stdout_logfile=/var/log/apache2.out.log
+EOF
+
 echo "Rol de Apache creado y configurado."
-
-# Instalar dependencias necesarias
-echo "Instalando dependencias..."
-
-# Quitar versiones previas de Docker (si las hay)
-# sudo apt remove -y docker docker.io docker-doc docker-compose || true
-
-# Añadir repositorio oficial de Docker
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-sudo apt update
-
-# Instalar Docker 27.5.1 + plugins necesarios
-sudo apt install -y \
-  docker-ce=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
-  docker-ce-cli=5:27.5.1~ubuntu.$(lsb_release -rs)~$(lsb_release -cs) \
-  containerd.io \
-  docker-buildx-plugin \
-  docker-compose-plugin
-
-# Instalar dependencias adicionales
-sudo apt install -y criu ansible ssh util-linux bsdmainutils
 
 echo "Setup inicial completado con éxito."

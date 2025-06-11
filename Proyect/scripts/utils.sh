@@ -134,41 +134,37 @@ mapear_puerto_personalizado() {
 
 # === Funciones de contenedores ===
 capturar_estado_contenedor() {
-    local servidor="$1"
-    local compose_file="compose/$servidor/docker-compose.yml"
-    ansible_disponible $servidor
-    
-    # Obtener el nombre del servicio desde el compose (asumimos el primero definido)
-    local servicio=$(awk '/services:/ {getline; print $1}' "$compose_file" | tr -d ':')
+    local container_name="$1"
+    local dockerfile_path="$2"
+    local new_image_tag="$container_name:latest"
 
-    if [[ -z "$servicio" ]]; then
-        echo "❌ No se pudo detectar el nombre del servicio en $compose_file"
-        return 1
-    fi
-    
-    # Obtener el container ID
-    local container_id
-    container_id=$(docker compose -f "$compose_file" ps -q "$servicio")
-
-    if [[ -z "$container_id" ]]; then
-        echo "❌ No se encontró contenedor en ejecución para el servicio '$servicio'."
+    if [[ -z "$container_name" || -z "$dockerfile_path" ]]; then
+        echo "Usage: capturar_estado_contenedor <container_name> <dockerfile_path>"
         return 1
     fi
 
-    local imagen="${servicio}:latest"
-
-    # Si la imagen existe, borrarla antes
-    if docker image inspect "$imagen" &>/dev/null; then
-        echo "🧹 Eliminando imagen previa '$imagen'..."
-        docker image rm -f "$imagen"
+    # Check if image with the tag already exists
+    if docker image inspect "$new_image_tag" > /dev/null 2>&1; then
+        echo "Image $new_image_tag already exists. Removing it to avoid duplicity."
+        docker rmi "$new_image_tag" || {
+            echo "Failed to remove existing image $new_image_tag"
+            return 1
+        }
     fi
 
-    echo "📦 Creando nueva imagen '$imagen' desde el contenedor '$container_id'..."
-    docker commit "$container_id" "$imagen"
+    # Commit container to new image
+    docker commit "$container_name" "$new_image_tag" || {
+        echo "Failed to commit container $container_name"
+        return 1
+    }
 
-    # Reemplazar la imagen en el docker-compose.yml
-    sed -i "s|^\([[:space:]]*image:\).*|\1 $imagen|" "$compose_file"
-    echo "✅ Imagen '$imagen' aplicada al compose."
+    # Replace first FROM line in Dockerfile with new image
+    sed -i "1s|^FROM .*|FROM $new_image_tag|" "$dockerfile_path" || {
+        echo "Failed to update Dockerfile at $dockerfile_path"
+        return 1
+    }
+
+    echo "Committed container '$container_name' as '$new_image_tag' and updated Dockerfile at '$dockerfile_path'."
 }
 
 
@@ -221,6 +217,48 @@ reiniciar_contenedor(){
     local compose_file="$COMPOSE_DIR/$servidor/docker-compose.yml"
     echo "🔄 Reiniciando contenedor..."
     docker compose -f "$compose_file" down
-    docker compose -f "$compose_file" up -d
+    docker compose -f "$compose_file" up -d --build
     echo "Contenedor reiniciado."
+}
+
+inyectar_supervisord_conf() {
+    local server_conf_file="$1"
+    local rol_conf_file="$2"
+
+    echo "" >> $server_conf_file
+    cat "$rol_conf_file" >> "$server_conf_file"
+
+    echo "✅ Inyección completada en $conf_file"
+}
+
+correr_servidores_inactivos() {
+    actualizar_lista
+    local csv_file="$CSV"
+
+    if [[ ! -f "$csv_file" ]]; then
+    echo "CSV file not found: $csv_file"
+    return 1
+    fi
+
+    while IFS=, read -r server_name network state; do
+    if [[ "$state" == "inactivo" ]]; then
+        echo "Starting docker compose for server: $server_name"
+        docker compose -f compose/$server_name/docker-compose.yml up -d --build
+    fi
+    done < "$csv_file"
+}
+
+actualizar_lista(){
+    tmp_csv=$(mktemp)
+
+    while IFS=',' read -r nombre red estado; do
+        if docker ps --format '{{.Names}}' | grep -q "^${nombre}$"; then
+            nuevo_estado="activo"
+        else
+            nuevo_estado="inactivo"
+        fi
+        echo "$nombre,$red,$nuevo_estado" >> "$tmp_csv"
+    done < "$CSV"
+
+    mv "$tmp_csv" "$CSV"
 }

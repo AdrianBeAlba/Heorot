@@ -1,65 +1,64 @@
 #!/bin/bash
 
-# === Configuración ===
-EXPORTS_DIR="exports"
+set -euo pipefail
+
 COMPOSE_DIR="compose"
 ROLES_DIR="roles"
-UTILS_PATH="scripts/utils.sh"
 TEMP_DIR="temp"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-CHECKPOINT_SUFFIX="checkpoint-export"
 
-# === Cargar utilidades ===
-if [[ ! -f "$UTILS_PATH" ]]; then
-    echo "❌ No se encontró '$UTILS_PATH'."
-    exit 1
-fi
-source "$UTILS_PATH"
+SERVIDORES="temp/servidores.csv"
+EXPORT_TEMP="exports/temp_export"
 
-# === Pedir nombre de exportación ===
-read -p "Introduce el nombre del archivo de exportación (sin extensión): " EXPORT_NAME
-EXPORT_NAME=${EXPORT_NAME:-"infraestructura_${TIMESTAMP}"}
-EXPORT_PATH="${EXPORTS_DIR}/${EXPORT_NAME}.tar.gz"
+source scripts/utils.sh
 
-# === Crear carpeta de exportaciones si no existe ===
-mkdir -p "$EXPORTS_DIR"
+mkdir -p "$EXPORT_TEMP"
 
-# === Verificar estructura existente ===
-for dir in "$COMPOSE_DIR" "$ROLES_DIR" "$TEMP_DIR"; do
-    if [ ! -d "$dir" ]; then
-        echo "❌ Falta la carpeta '$dir/'."
-        exit 1
+read -p "Nombre de la exportacion: " exp_name
+ARCHIVE_NAME="exports/$exp_name.tar.gz"
+
+while IFS=',' read -r nombre_servicio red estado; do
+    # Saltar encabezado o líneas vacías
+    [[ "$nombre_servicio" == "nombre" || -z "$nombre_servicio" ]] && continue
+    dockerfile_path="compose/$nombre_servicio/Dockerfile"
+
+    if [[ "$estado" == "activo" ]]; then
+        echo "🔍 Procesando $nombre_servicio (estado: $estado)..."
+
+        capturar_estado_contenedor "$nombre_servicio" "$dockerfile_path"|| {
+            echo "❌ Falló la captura del contenedor $nombre_servicio"
+            continue
+        }
+
+        imagen="${nombre_servicio}:latest"
+        archivo_salida="$EXPORT_TEMP/${nombre_servicio// /_}.tar"
+
+        echo "📦 Guardando imagen '$imagen' como '$archivo_salida'..."
+        if docker save -o "$archivo_salida" "$imagen"; then
+            echo "✅ Imagen exportada correctamente: $archivo_salida"
+        else
+            echo "❌ Error exportando la imagen: $imagen"
+            continue
+        fi
+    else
+        echo "⏭️  Saltando $nombre_servicio (estado: $estado)"
     fi
+done < "$SERVIDORES"
+
+# Comprobamos si los directorios existen
+for DIR in "$COMPOSE_DIR" "$ROLES_DIR" "$TEMP_DIR" "$EXPORT_TEMP"; do
+  if [ ! -d "$DIR" ]; then
+    echo "Error: El directorio '$DIR' no existe." >&2
+    exit 1
+  fi
 done
 
-# === Crear checkpoints por contenedor ===
-echo "🧠 Creando checkpoints de contenedores activos..."
+# Regenerar y actualizar inventario
+generar_inventario
 
-while IFS=, read -r nombre_servidor _; do
-    [[ "$nombre_servidor" == "nombre" || -z "$nombre_servidor" ]] && continue
+# Crear el archivo tar.gz
+echo "Creando archivo $ARCHIVE_NAME con $COMPOSE_DIR, $EXPORT_TEMP, $ROLES_DIR y $TEMP_DIR..."
+tar -czf "$ARCHIVE_NAME" "$COMPOSE_DIR" "$ROLES_DIR" "$TEMP_DIR" "$EXPORT_TEMP"
 
-    echo "⏳ Checkpointing contenedor: $nombre_servidor"
+rm -rf "$EXPORT_TEMP"
 
-    checkpoint_path="${COMPOSE_DIR}/${nombre_servidor}/checkpoints"
-    mkdir -p "$checkpoint_path"
-
-    if ! docker checkpoint create --checkpoint-dir="$checkpoint_path" "$nombre_servidor" "$CHECKPOINT_SUFFIX"; then
-        echo "❌ Error creando checkpoint para $nombre_servidor"
-        exit 1
-    fi
-done < "$TEMP_DIR/servidores.csv"
-
-# === Crear archivo tar.gz con toda la infraestructura ===
-echo "📦 Empaquetando infraestructura (roles/, temp/, compose/)..."
-
-tar -czf "$EXPORT_PATH" \
-    "$ROLES_DIR"/ \
-    "$TEMP_DIR"/ \
-    "$COMPOSE_DIR/"
-
-if [[ $? -ne 0 ]]; then
-    echo "❌ Error durante la creación del archivo TAR."
-    exit 1
-fi
-
-echo "✅ Exportación completada: $EXPORT_PATH"
+echo "Archivo creado correctamente: $ARCHIVE_NAME"

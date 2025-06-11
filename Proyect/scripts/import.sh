@@ -1,97 +1,119 @@
 #!/bin/bash
 
-# === Rutas base ===
-EXPORTS_DIR="imports"
-COMPOSE_DIR="compose"
-UTILS_PATH="scripts/utils.sh"
-IMPORT_TMP="tmp_import"
+IMPORT_DIR="imports"
 
-# === Cargar utilidades ===
-if [[ ! -f "$UTILS_PATH" ]]; then
-    echo "❌ No se encontró '$UTILS_PATH'. Aborta importación."
-    exit 1
-fi
-source "$UTILS_PATH"
+source scripts/utils.sh
+# Buscar archivos .tar.gz
+mapfile -t ARCHIVOS < <(find "$IMPORT_DIR" -maxdepth 1 -name '*.tar.gz' | sort)
 
-# === Mostrar lista de exportaciones disponibles ===
-mapfile -t tar_files < <(find "$EXPORTS_DIR" -maxdepth 1 -type f -name "*.tar.gz")
-
-if [[ ${#tar_files[@]} -eq 0 ]]; then
-    echo "❌ No hay archivos .tar.gz en '$EXPORTS_DIR'."
+if [[ ${#ARCHIVOS[@]} -eq 0 ]]; then
+    echo "❌ No se encontraron archivos .tar.gz en '$IMPORT_DIR'."
     exit 1
 fi
 
-echo "📦 Elige el archivo de importación:"
-select TAR_FILE in "${tar_files[@]}"; do
-    [[ -n "$TAR_FILE" ]] && break
-    echo "Selección inválida."
+echo "📦 Archivos de infraestructura disponibles:"
+for i in "${!ARCHIVOS[@]}"; do
+    echo "  [$i] ${ARCHIVOS[$i]}"
 done
 
-# === Confirmar backup previo ===
-read -p "¿Hacer backup de la infraestructura actual antes de importar? (s/n): " confirm
-if [[ "$confirm" =~ ^[sS]$ ]]; then
-    ./scripts/export.sh || echo "⚠️ Backup previo fallido."
+read -p "Selecciona un archivo por número: " seleccion
+
+# Validar selección
+if ! [[ "$seleccion" =~ ^[0-9]+$ ]] || (( seleccion < 0 || seleccion >= ${#ARCHIVOS[@]} )); then
+    echo "❌ Selección inválida."
+    exit 1
 fi
 
-# === Detener contenedores actuales ===
-echo "⛔ Deteniendo contenedores existentes..."
-for server_path in "$COMPOSE_DIR"/*/; do
-    compose_file="${server_path}docker-compose.yml"
-    if [[ -f "$compose_file" ]]; then
-        docker compose -f "$compose_file" down
-    fi
-done
+ARCHIVO_ELEGIDO="${ARCHIVOS[$seleccion]}"
+echo "✅ Has seleccionado: $ARCHIVO_ELEGIDO"
+echo
 
-# === Prune de volúmenes y limpieza ===
-echo "🧹 Pruneando volúmenes Docker y limpiando estructura anterior..."
-docker volume prune -f
-rm -rf "$COMPOSE_DIR" roles temp redes.csv
+# Ofrecer exportación de seguridad
+read -p "¿Deseas hacer una copia de seguridad antes de continuar? (s/n): " hacer_backup
+if [[ "$hacer_backup" =~ ^[sS]$ ]]; then
+    echo "📤 Ejecutando backup con scripts/export.sh..."
+    bash scripts/export.sh
+    echo "✅ Backup finalizado."
+    echo
+fi
 
-# === Descomprimir la importación ===
-echo "📦 Extrayendo '$TAR_FILE'..."
-mkdir -p "$IMPORT_TMP"
-tar -xzf "$TAR_FILE" -C "$IMPORT_TMP"
+# Confirmar destrucción
+echo "⚠️  Esta operación destruirá la infraestructura actual: contenedores, volúmenes, configuración..."
+read -p "¿Estás seguro de continuar? (s/n): " confirmar
+if [[ ! "$confirmar" =~ ^[sS]$ ]]; then
+    echo "❌ Operación cancelada."
+    exit 0
+fi
 
-# === Restaurar carpetas del entorno ===
-mv "$IMPORT_TMP/compose" ./
-mv "$IMPORT_TMP/roles" ./
-mv "$IMPORT_TMP/temp" ./
-mv "$IMPORT_TMP/redes.csv" ./ 2>/dev/null || true
+echo "✅ Confirmación recibida. Continuando con la restauración..."
 
-# === Recrear redes ===
-if [[ -f redes.csv ]]; then
-    echo "🌐 Restaurando redes Docker..."
-    while IFS=, read -r nombre red cidr; do
+# Eliminar contenedores definidos en temp/servidores.csv
+SERVIDORES_CSV="temp/servidores.csv"
+
+if [[ -f "$SERVIDORES_CSV" ]]; then
+    echo "🧹 Eliminando contenedores definidos en $SERVIDORES_CSV..."
+    while IFS=',' read -r nombre_servicio red estado; do
+        [[ "$nombre_servicio" == "nombre" || -z "$nombre_servicio" ]] && continue
+        if docker ps -a --format '{{.Names}}' | grep -q "^$nombre_servicio$"; then
+            echo "⛔ Parando y eliminando contenedor: $nombre_servicio"
+            docker compose -f "compose/$nombre_servicio/docker-compose.yml" down || docker rm -f "$nombre_servicio"
+        fi
+    done < "$SERVIDORES_CSV"
+else
+    echo "⚠️  No se encontró $SERVIDORES_CSV, se omite eliminación de contenedores."
+fi
+
+# Eliminar directorios locales
+echo "🗑️  Eliminando carpetas locales: compose/, roles/, temp/"
+rm -rf compose roles temp
+
+#Extraer los datos de la estructura
+echo "📦 Extrayendo archivo: $ARCHIVO_ELEGIDO..."
+tar -xzf "$ARCHIVO_ELEGIDO"
+
+EXPORT_IMG_DIR="exports/temp_export"
+
+if [[ -d "$EXPORT_IMG_DIR" ]]; then
+    echo "📂 Cargando imágenes Docker desde $EXPORT_IMG_DIR..."
+    for img_tar in "$EXPORT_IMG_DIR"/*.tar; do
+        [[ -f "$img_tar" ]] || continue
+        echo "📥 Cargando imagen: $img_tar"
+        docker load -i "$img_tar"
+    done
+    echo "✅ Todas las imágenes han sido cargadas."
+
+    # 🔥 Eliminar carpeta temporal de imágenes después de cargar
+    echo "🧹 Limpiando carpeta temporal de imágenes..."
+    rm -rf "$EXPORT_IMG_DIR"
+else
+    echo "⚠️  No se encontró la carpeta de imágenes: $EXPORT_IMG_DIR"
+fi
+
+#Importacion de redes
+REDES_CSV="temp/redes.csv"
+
+if [[ -f "$REDES_CSV" ]]; then
+    echo "🌐 Creando redes definidas en $REDES_CSV..."
+    while IFS=',' read -r nombre subnet mascara; do
+        # Saltar encabezado o líneas vacías
         [[ "$nombre" == "nombre" || -z "$nombre" ]] && continue
-        echo "→ Creando red '$nombre' ($red/$cidr)..."
-        docker network create --subnet="$red/$cidr" "$nombre" 2>/dev/null || true
-    done < redes.csv
+
+        # Validar si ya existe la red
+        if docker network ls --format '{{.Name}}' | grep -q "^${nombre}$"; then
+            echo "🔁 Red '$nombre' ya existe, omitiendo creación."
+        else
+            echo "➕ Creando red '$nombre' con subred ${subnet}/${mascara}"
+            docker network create \
+                --driver bridge \
+                --subnet "${subnet}/${mascara}" \
+                "$nombre"
+        fi
+    done < "$REDES_CSV"
+    echo "✅ Redes configuradas correctamente."
+else
+    echo "⚠️  No se encontró el archivo de redes: $REDES_CSV"
 fi
 
-# === Levantar contenedores ===
-echo "🔼 Levantando contenedores desde nuevos 'compose'..."
-for server_path in "$COMPOSE_DIR"/*/; do
-    compose_file="${server_path}docker-compose.yml"
-    if [[ -f "$compose_file" ]]; then
-        docker compose -f "$compose_file" up -d
-    fi
-done
-
-# === Copiar claves SSH ===
-echo "🔐 Reinstalando claves SSH..."
-if [[ -f temp/temp_servidores.csv ]]; then
-    while IFS=, read -r nombre_servidor _; do
-        [[ "$nombre_servidor" == "nombre" || -z "$nombre_servidor" ]] && continue
-        copiar_clave_ssh "$nombre_servidor"
-    done < temp/temp_servidores.csv
-fi
-
-# === Regenerar inventario de Ansible ===
-echo "📜 Regenerando inventario Ansible..."
-generar_inventario
-
-
-# === Limpiar temporal ===
-rm -rf "$IMPORT_TMP"
-
-echo "✅ Importación completada con éxito. Infraestructura lista."
+#Levantar las maquinas
+echo "Levantando maquinas"
+correr_servidores_inactivos
