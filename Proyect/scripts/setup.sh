@@ -25,7 +25,7 @@ source scripts/utils.sh
 
 # Instalar dependencias necesarias
 echo "Instalando dependencias..."
-
+sudo apt install curl
 # Quitar versiones previas de Docker (si las hay)
 # sudo apt remove -y docker docker.io docker-doc docker-compose || true
 
@@ -50,7 +50,7 @@ sudo apt install -y \
   docker-compose-plugin
 
 # Instalar dependencias adicionales
-sudo apt install -y criu ansible ssh util-linux bsdmainutils
+sudo apt install -y  ansible ssh util-linux bsdmainutils
 
 # Crear las carpetas si no existen
 echo "Creando estructura de directorios..."
